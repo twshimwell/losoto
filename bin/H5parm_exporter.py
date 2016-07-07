@@ -22,170 +22,53 @@ except ImportError:
     import losoto.progressbar as progressbar
 
 
-def parmdbToAxes(solEntry):
-    """
-    Extract the information written as a string in the parmdb format
-    """
-    pol = None; pol1 = None; pol2 = None;
-    dir = None; ant = None; parm = None
+def getSoltypeFromSolTabs(solTabs):
+    """Return a list of parmdb solution type given for input tables
 
-    thisSolType = solEntry.split(':')[0]
+    This function is basically the reverse of parmdbToAxes() in
+    H5parm_importer.py.
 
-    # For CommonRotationAngle assuming [CommonRotationAngle:ant]
-    if thisSolType == 'CommonRotationAngle':
-        thisSolType, ant = solEntry.split(':')
-        dir = 'pointing'
-
-    # For RotationAngle assuming [RotationAngle:ant:sou]
-    elif thisSolType == 'RotationAngle':
-        thisSolType, ant, dir = solEntry.split(':')
-
-    # For CommonScalarPhase assuming [CommonScalarPhase:ant]
-    elif thisSolType == 'CommonScalarPhase':
-        thisSolType, ant = solEntry.split(':')
-        dir = 'pointing'
-
-    # For CommonScalarPhase assuming [CommonScalarPhase:ant]
-    elif thisSolType == 'CommonScalarAmplitude':
-        thisSolType, ant = solEntry.split(':')
-        dir = 'pointing'
-
-    # For ScalarPhase assuming [ScalarPhase:ant:sou]
-    elif thisSolType == 'ScalarPhase':
-        thisSolType, ant, dir = solEntry.split(':')
-
-    # For ScalarPhase assuming [ScalarPhase:ant:sou]
-    elif thisSolType == 'ScalarAmplitude':
-        thisSolType, ant, dir = solEntry.split(':')
-
-    # For TEC assuming [TEC:ant or TEC:pol:ant]
-    elif thisSolType == 'TEC':
-        try:
-            thisSolType, ant = solEntry.split(':')
-        except:
-            thisSolType, pol, ant = solEntry.split(':')
-            pol1 = pol
-            pol2 = pol
-        dir = 'pointing'
-
-    # For Clock assuming [Clock:ant or Clock:pol:ant]
-    elif thisSolType == 'Clock':
-        try:
-            thisSolType, ant = solEntry.split(':')
-        except:
-            thisSolType, pol, ant = solEntry.split(':')
-            pol1 = pol
-            pol2 = pol
-        dir = 'pointing'
-
-    # For RotationMeasure assuming [RotationMeasure:ant]
-    elif thisSolType == 'RotationMeasure':
-        dir = 'pointing'
-        try:
-            thisSolType, ant = solEntry.split(':')
-        except:
-            thisSolType, ant, dir = solEntry.split(':')
-
-    # For Gain assuming [Gain:pol1:pol2:parm:ant]
-    elif thisSolType == 'Gain':
-        thisSolType, pol1, pol2, parm, ant = solEntry.split(':')
-        dir = 'pointing'
-
-    # For DirectionalGain assuming [DirecitonalGain:pol1:pol2:parm:ant:sou]
-    elif thisSolType == 'DirectionalGain':
-        thisSolType, pol1, pol2, parm, ant, dir = solEntry.split(':')
-
-    else:
-        logging.error('Unknown solution type "'+thisSolType+'". Ignored.')
-
-    if pol1 != None and pol2 != None:
-        if pol1 == '0' and pol2 == '0': pol = 'XX'
-        if pol1 == '1' and pol2 == '0': pol = 'YX'
-        if pol1 == '0' and pol2 == '1': pol = 'XY'
-        if pol1 == '1' and pol2 == '1': pol = 'YY'
-
-    if pol != None:
-        pol = re.escape(pol)
-    if dir != None:
-        dir = re.escape(dir)
-    if ant != None:
-        ant = re.escape(ant)
-    return pol, dir, ant, parm
-
-
-def getSoltabFromSolType(solType, solTabs, parm='ampl'):
-    """Return a list of solution tables that corresponds to the type given
-
-    solType - string defining solution type. E.g., "DirectionalGain"
     solTabs - solution tables returned by h5parm.getSoltabs()
-    parm - parm to return if solType is "Gain": 'ampl'/'real' or
-           'phase'/'imag'
 
-    The soltab parmdb_type attribute is used as an additional filter to
-    to distinguish multiple possible matches. If it is not available, all
-    matches are returned.
     """
     solTabList = []
     if parm != None:
         parm = parm.lower()
 
     for name, st in solTabs.iteritems():
-        # Handle gain table separately, as we need to distinguish ampl and phase
-        if solType == 'DirectionalGain' or solType == 'Gain':
-            if (parm == 'ampl' or parm == 'real') and st._v_title == 'amplitude':
-                if hasattr(st._v_attrs, 'parmdb_type'):
-                    if st._v_attrs['parmdb_type'] is not None:
-                        if solType in st._v_attrs['parmdb_type'].split(', '):
-                            solTabList.append(st)
-                    else:
-                        solTabList.append(st)
-                else:
-                    solTabList.append(st)
-            elif (parm == 'phase' or parm == 'imag') and st._v_title == 'phase':
-                if hasattr(st._v_attrs, 'parmdb_type'):
-                    if st._v_attrs['parmdb_type'] is not None:
-                        if solType in st._v_attrs['parmdb_type'].split(', '):
-                            solTabList.append(st)
-                    else:
-                        solTabList.append(st)
-                else:
-                    solTabList.append(st)
-        else:
-            if hasattr(st._v_attrs, 'parmdb_type'):
-                if st._v_attrs['parmdb_type'] is not None:
-                    if solType in st._v_attrs['parmdb_type'].split(', '):
-                        solTabList.append(st)
-                else:
-                    if (solType == 'RotationAngle' or solType == 'CommonRotationAngle') and st._v_title == 'rotation':
-                        solTabList.append(st)
-                    elif (solType == 'CommonScalarPhase' or solType == 'ScalarPhase') and st._v_title == 'scalarphase':
-                        solTabList.append(st)
-                    elif (solType == 'CommonScalarAmplitude' or solType == 'ScalarAmplitude') and st._v_title == 'scalaramplitude':
-                        solTabList.append(st)
-                    elif solType == 'Clock' and st._v_title == 'clock':
-                        solTabList.append(st)
-                    elif solType == 'TEC' and st._v_title == 'tec':
-                        solTabList.append(st)
-                    elif solType == 'RotationMeasure' and st._v_title == 'rotationmeasure':
-                        solTabList.append(st)
+        if st._v_title == 'amplitude':
+            if dir == 'pointing':
+                solType == 'Gain'
             else:
-                if (solType == 'RotationAngle' or solType == 'CommonRotationAngle') and st._v_title == 'rotation':
-                    solTabList.append(st)
-                elif (solType == 'CommonScalarPhase' or solType == 'ScalarPhase') and st._v_title == 'scalarphase':
-                    solTabList.append(st)
-                elif (solType == 'CommonScalarAmplitude' or solType == 'ScalarAmplitude') and st._v_title == 'scalaramplitude':
-                    solTabList.append(st)
-                elif solType == 'Clock' and st._v_title == 'clock':
-                    solTabList.append(st)
-                elif solType == 'TEC' and st._v_title == 'tec':
-                    solTabList.append(st)
-                elif solType == 'RotationMeasure' and st._v_title == 'rotationmeasure':
-                    solTabList.append(st)
+                solType == 'DirectionalGain'
+        elif st._v_title == 'phase':
+            if dir == 'pointing':
+                solType == 'Gain'
+            else:
+                solType == 'DirectionalGain'
+        elif st._v_title == 'rotation':
+            if dir == 'pointing':
+                solType == 'CommonRotationAngle'
+            else:
+                solType == 'RotationAngle'
+        elif st._v_title == 'scalarphase':
+            if dir == 'pointing':
+                solType == 'CommonScalarPhase'
+            else:
+                solType == 'ScalarPhase'
+        elif st._v_title == 'scalaramplitude':
+            if dir == 'pointing':
+                solType == 'CommonScalarAmplitude'
+            else:
+                solType == 'ScalarAmplitude'
+        elif st._v_title == 'clock':
+            solType == 'Clock'
+        elif st._v_title == 'tec':
+            solType == 'TEC'
+        elif st._v_title == 'rotationmeasure':
+            solType == 'RotationMeasure'
 
-    if len(solTabList) == 0:
-        return None
-    else:
-        return solTabList
+    return solTabList
 
 
 def makeTECparmdb(H, solset, TECsolTab, timewidths, freq, freqwidth):
@@ -315,21 +198,14 @@ def makeTECparmdb(H, solset, TECsolTab, timewidths, freq, freqwidth):
 if __name__=='__main__':
     # Options
     import optparse
-    opt = optparse.OptionParser(usage='%prog <H5parm filename> <output globaldb/SB filename>\n'+
+    opt = optparse.OptionParser(usage='%prog <H5parm filename> <output parmdb>\n'+
         _author, version='%prog '+_version.__version__)
     opt.add_option('-v', '--verbose', help='Go VeRbOsE!',
         action='store_true', default=False)
     opt.add_option('-s', '--solset', help='Name of solution set to export '
         '(default=sol000)', type='string', default='sol000')
-    opt.add_option('-o', '--outfile', help='Filename of globaldb/SB to export parmdb to '
-        '(default=input globaldb/SB filename)', type='string', default=None)
-    opt.add_option('-r', '--root', help='Root string to prepend to input parmdb '
-        'instrument directories to make the output parmdb directories '
-        '(default=solution-set name)', type='string', default=None)
     opt.add_option('-t', '--soltab', help='Solution tables to export; e.g., '
         '"amplitude000, phase000" (default=all)', type='string', default='all')
-    opt.add_option('-i', '--instrument', help='Name of the instrument table '
-        '(default=instrument*)', type='string', default='instrument*')
     opt.add_option('-c', '--clobber', help='Clobber exising files '
         '(default=False)', action='store_true', default=False)
     (options, args) = opt.parse_args()
@@ -348,16 +224,9 @@ if __name__=='__main__':
         sys.exit(1)
     logging.info("Input H5parm filename = "+h5parmFile)
 
-    # Open the h5parm file and get solution set names
+    # Open the H5parm file and get solution set names
     h5parm_in = h5parm(h5parmFile, readonly = True)
     solsetNames = h5parm_in.getSolsets()
-
-    # Check input parmdb file
-    globaldbFile = args[1]
-    if not os.path.exists(globaldbFile):
-        logging.critical('Input globaldb/SB file not found.')
-        sys.exit(1)
-    logging.info("Input globaldb/SB filename = "+globaldbFile)
 
     # Check input solution set name
     solsetName = options.solset
@@ -367,32 +236,16 @@ if __name__=='__main__':
     logging.info("Solution set name = "+solsetName)
     solset = h5parm_in.getSolset(solsetName)
 
-    # Make output parmdb directory if needed
-    out_globaldbFile = options.outfile
-    if out_globaldbFile is None:
-        out_globaldbFile = globaldbFile
-    if not os.path.exists(out_globaldbFile):
-        os.mkdir(out_globaldbFile)
-    logging.info("Output globaldb/SB filename = "+out_globaldbFile)
+    # Check output parmdb file
+    globaldbFile = args[1]
+    logging.info("Output globaldb/SB filename = "+globaldbFile)
+    if not os.path.exists(globaldbFile):
+        out_globaldbFile_exists = False
+        logging.info('Output globaldb/SB file not found. It will be created.')
+    else:
+        out_globaldbFile_exists = True
 
-    # Check output root
-    outroot = options.root
-    if outroot is None:
-        outroot = solsetName
-
-    # Make a list of all available instrument tables (only 1 for a standard MS)
-    instrumentdbFiles = [ instrumentdbFile for instrumentdbFile in \
-        glob.glob(os.path.join(globaldbFile, options.instrument)) \
-        if os.path.isdir(instrumentdbFile) ]
-    if len(instrumentdbFiles) == 0:
-        logging.critical('No parmdb table(s) found in input globaldb/SB file.')
-        sys.exit(1)
-    instrumentdbFiles.sort()
-
-    # Find solution table types using the first instrumentdb
-    # TODO: is there a better solution which check all the instrumentdbs?
-    pdb = lofar.parmdb.parmdb(instrumentdbFiles[0])
-    solTypes = list(set(x[0] for x in  (x.split(":") for x in pdb.getNames())))
+    # Find solution table types
     solTabs = h5parm_in.getSoltabs(solset)
     if options.soltab != 'all':
         soltabs_to_use = [s.strip() for s in options.soltab.split(',')]
@@ -406,28 +259,15 @@ if __name__=='__main__':
                 logging.warning('Solution table {0} not found in input H5parm file.'.format(s))
         solTabs = solTabs_filt
     if len(solTabs) == 0:
-        logging.critical('No solution tables found in input H5parm file')
+        logging.critical('No solution tables found matching input criteria.')
         sys.exit(1)
-    pdbSolTypes = solTypes[:]
-    for solType in pdbSolTypes:
-        solTabList = getSoltabFromSolType(solType, solTabs, 'ampl')
-        if solTabList is None:
-            # Search for type phase solutions if no ampl ones where found
-            solTabList = getSoltabFromSolType(solType, solTabs, 'phase')
-        if solTabList is None:
-            logging.warning("Solution type {0} not found in solution set {1}. Skipping.".format(solType, solsetName))
-            solTypes.remove(solType)
+    solTypes = getSoltypeFromSolTabs(solTabs)
+    if len(solTypes) is None:
+        logging.warning("No valid solutions found in solution set {0}.".format(solsetName))
+        sys.exit(1)
 
-    # Look for tecscreen solution table in the solset. If
-    # found, add to solTypes
-    st_tec = None
-    for name, st in solTabs.iteritems():
-        if st._v_title == 'tecscreen':
-            st_tec = st
-    if st_tec is not None:
-        solTypes.append('TECScreen')
     solTypes = list(set(solTypes))
-    logging.info('Found solution types in input parmdb and H5parm: '+', '.join(solTypes))
+    logging.info('Exporting the following solution types: '+', '.join(solTypes))
 
     # For each solType, select appropriate solutions and construct
     # the dictionary to pass to pdb.addValues()
@@ -540,7 +380,7 @@ if __name__=='__main__':
                     # check whether this is clock or tec; if so, reshape properly to account for all freqs in the parmdb
                     # anyway these tables are freq-indep
                     #if solType == "Clock" or solType == "TEC" or solType == "RotationMeasure":
-                    #    # find freq-dimensionality 
+                    #    # find freq-dimensionality
                     #    nfreq = freqs.shape[0]
                     #    print val.shape
                     #    # reshape such that all freq arrays are filled properly

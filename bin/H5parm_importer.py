@@ -5,8 +5,8 @@ This tool is used to convert a parmdb into a H5parm format.
 It can be run on a globaldb created with parmdb_collector.py
 or on a single SB which contains the necessary
 sky/instrument/ANTENNA/FIELD tables.
-It can also load a dictionary from a json or pickle file with the keys 
-instrumentdb (array with file names), antenna, field and skydb containing the 
+It can also load a dictionary from a json or pickle file with the keys
+instrumentdb (array with file names), antenna, field and skydb containing the
 corresponding file names.
 It handles Gain/DirectionalGain/RotationAngle/
            Clock/TEC/CommonRotationAngle/CommonScalarPhase/CommonScalarAmpitude solution types.
@@ -127,15 +127,15 @@ def create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
        h5parmFile - file name of the h5parm file that will be created.
        complevel - level of compression. It is usually 5.
        solsetName - Name of the solution set. Usually "sol###".
-       globaldbFile (optional) - Name of the globaldbFile. Used only for 
+       globaldbFile (optional) - Name of the globaldbFile. Used only for
          logging purposes.
     """
-    
+
     # open/create the h5parm file and the solution-set
     h5parm = h5parm2(h5parmFile, readonly = False, complevel = complevel)
-    
+
     solset = h5parm.makeSolset(solsetName)
-    
+
     # Create tables using the first instrumentdb
     # TODO: all the instrument tables should be checked
     pdb = lofar.parmdb.parmdb(instrumentdbFiles[0])
@@ -214,13 +214,21 @@ def create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
                 if ant != None: ants |= set([ant])
                 freqs |= set(data[solEntry]['freqs'])
                 times |= set(data[solEntry]['times'])
+                freqwidths |= set(data[solEntry]['freqwidths'])
+                timewidths |= set(data[solEntry]['timewidths'])
                 pbar.update(ipbar)
             ipbar += 1
 
         pbar.finish()
 
-        pols = np.sort(list(pols)); dirs = np.sort(list(dirs)); ants = np.sort(list(ants)); freqs = np.sort(list(freqs)); times = np.sort(list(times))
-        shape = [i for i in (len(pols), len(dirs), len(ants), len(freqs), len(times)) if i != 0]
+        pols = np.sort(list(pols))
+        dirs = np.sort(list(dirs))
+        ants = np.sort(list(ants))
+        freqs = np.sort(list(freqs))
+        times = np.sort(list(times))
+        freqwidths = np.sort(list(freqwidths))
+        timewidths = np.sort(list(timewidths))
+        shape = [i for i in (len(pols), len(dirs), len(ants), len(freqs), len(times), len(freqwidths), len(timewidths)) if i != 0]
         vals = np.empty(shape)
         vals[:] = np.nan
         weights = np.zeros(shape, dtype=np.float16)
@@ -244,6 +252,8 @@ def create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
 
                 freq = data[solEntry]['freqs']
                 time = data[solEntry]['times']
+                freqwidth = data[solEntry]['freqwidths']
+                timewidth = data[solEntry]['timewidths']
 
                 val = data[solEntry]['values']
 
@@ -269,8 +279,10 @@ def create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
                     coords.append(antCoord)
                 freqCoord = np.searchsorted(freqs, freq)
                 timeCoord = np.searchsorted(times, time)
-                vals[tuple(coords)][np.ix_(freqCoord,timeCoord)] = val.T
-                weights[tuple(coords)][np.ix_(freqCoord,timeCoord)] = 1
+                freqwidthCoord = np.searchsorted(freqwidths, freqwidth)
+                timewidthCoord = np.searchsorted(timewidths, timewidth)
+                vals[tuple(coords)][np.ix_(freqCoord,timeCoord,freqwidthCoord,timewidthCoord)] = val.T
+                weights[tuple(coords)][np.ix_(freqCoord,timeCoord,freqwidthCoord,timewidthCoord)] = 1
                 pbar.update(ipbar)
             ipbar += 1
 
@@ -280,47 +292,47 @@ def create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
         pbar.finish()
         if solType == '*RotationAngle':
             np.putmask(weights, vals == 0., 0) # flag where val=0
-            h5parm.makeSoltab(solset, 'rotation', axesNames=['dir','ant','freq','time'], \
-                    axesVals=[dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+            h5parm.makeSoltab(solset, 'rotation', axesNames=['dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
         if solType == '*RotationMeasure':
             np.putmask(weights, vals == 0., 0) # flag where val=0
-            h5parm.makeSoltab(solset, 'rotationmeasure', axesNames=['dir','ant','freq','time'], \
-                    axesVals=[dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+            h5parm.makeSoltab(solset, 'rotationmeasure', axesNames=['dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
         elif solType == '*ScalarPhase':
             np.putmask(weights, vals == 0., 0)
-            h5parm.makeSoltab(solset, 'scalarphase', axesNames=['dir','ant','freq','time'], \
-                    axesVals=[dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+            h5parm.makeSoltab(solset, 'scalarphase', axesNames=['dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
         elif solType == '*ScalarAmplitude':
             np.putmask(weights, vals == 0., 0)
-            h5parm.makeSoltab(solset, 'scalaramplitude', axesNames=['dir','ant','freq','time'], \
-                    axesVals=[dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+            h5parm.makeSoltab(solset, 'scalaramplitude', axesNames=['dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
         elif solType == 'Clock':
             np.putmask(weights, vals == 0., 0)
             # clock may be diag or scalar
             if len(pols) == 0:
-                h5parm.makeSoltab(solset, 'clock', axesNames=['ant','freq','time'], \
-                    axesVals=[ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+                h5parm.makeSoltab(solset, 'clock', axesNames=['ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
             else:
-                h5parm.makeSoltab(solset, 'clock', axesNames=['pol','ant','freq','time'], \
-                    axesVals=[pol,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+                h5parm.makeSoltab(solset, 'clock', axesNames=['pol','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[pol,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
         elif solType == 'TEC':
             np.putmask(weights, vals == 0., 0)
             # tec may be diag or scalar
             if len(pols) == 0:
-                h5parm.makeSoltab(solset, 'tec', axesNames=['dir','ant','freq','time'], \
-                    axesVals=[dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+                h5parm.makeSoltab(solset, 'tec', axesNames=['dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
             else:
-                h5parm.makeSoltab(solset, 'tec', axesNames=['pol','dir','ant','freq','time'], \
-                    axesVals=[pols,dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+                h5parm.makeSoltab(solset, 'tec', axesNames=['pol','dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[pols,dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
         elif solType == '*Gain:*:Real' or solType == '*Gain:*:Ampl':
             np.putmask(vals, vals == 0, 1) # nans were put to 0 before, set them to 1
             np.putmask(weights, vals == 1., 0) # flag where val=1
-            h5parm.makeSoltab(solset, 'amplitude', axesNames=['pol','dir','ant','freq','time'], \
-                    axesVals=[pols,dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+            h5parm.makeSoltab(solset, 'amplitude', axesNames=['pol','dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[pols,dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
         elif solType == '*Gain:*:Imag' or solType == '*Gain:*:Phase':
             np.putmask(weights, vals == 0., 0) # falg where val=0
-            h5parm.makeSoltab(solset, 'phase', axesNames=['pol','dir','ant','freq','time'], \
-                    axesVals=[pols,dirs,ants,freqs,times], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
+            h5parm.makeSoltab(solset, 'phase', axesNames=['pol','dir','ant','freq','time','freqwidth','timewidth'], \
+                    axesVals=[pols,dirs,ants,freqs,times,freqwidths,timewidths], vals=vals, weights=weights, parmdbType=', '.join(list(ptype)))
 
         logging.info('Flagged data: %.3f%%' % (100.*(len(weights.flat)-np.count_nonzero(weights))/len(weights.flat)))
 
@@ -427,8 +439,8 @@ def create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
         logging.info(str(h5parm))
 
     del h5parm
-    logging.info('Done.')    
-    
+    logging.info('Done.')
+
 
 if __name__=='__main__':
     # Options
@@ -449,13 +461,13 @@ if __name__=='__main__':
 
     h5parmFile = args[0]
     logging.info("H5parm filename = "+h5parmFile)
-    
+
     # Common options
     complevel = options.complevel
     solsetName = options.solset
 
     input_file = args[1]
-    
+
     if input_file.endswith(".json"):
         try:
             import json
@@ -486,15 +498,15 @@ if __name__=='__main__':
             logging.critical('Input globaldb/SB file not found.')
             sys.exit(1)
         logging.info("globaldb filename = "+globaldbFile)
-        
+
         # Load the path of the files
         antennaFile = os.path.join(globaldbFile,'ANTENNA')
         fieldFile = os.path.join(globaldbFile,'FIELD')
         skydbFile = os.path.join(globaldbFile,'sky')
 
         # Make a list of all available instrument tables (only 1 for a standard MS)
-        instrumentdbFiles = [ instrumentdbFile for instrumentdbFile in \
-            glob.glob(os.path.join(globaldbFile,options.instrument)) \
+        instrumentdbFiles = [ instrumentdbFile for instrumentdbFile in
+            glob.glob(os.path.join(globaldbFile,options.instrument))
             if os.path.isdir(instrumentdbFile) ]
 
     # Check antennaFile and fieldFile
@@ -504,8 +516,8 @@ if __name__=='__main__':
     if not os.path.isdir(fieldFile):
         logging.critical('Missing FIELD table.')
         sys.exit(1)
-            
-    
+
+
     # Call the method that creates the h5parm file
     create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
                   h5parmFile, complevel, solsetName, globaldbFile=globaldbFile)
