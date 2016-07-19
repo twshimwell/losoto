@@ -32,8 +32,6 @@ def getSoltypeFromSolTabs(solTabs):
 
     """
     solTabList = []
-    if parm != None:
-        parm = parm.lower()
 
     for name, st in solTabs.iteritems():
         if st._v_title == 'amplitude':
