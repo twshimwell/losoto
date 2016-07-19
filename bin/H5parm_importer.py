@@ -187,8 +187,9 @@ def create_h5parm(instrumentdbFiles, antennaFile, fieldFile, skydbFile,
         # skip missing solTypes (not all parmdbs have e.g. TEC)
         if len(pdb.getNames(solType+':*')) == 0: continue
 
-        pols = set(); dirs = set(); ants = set();
-        freqs = set(); times = set(); ptype = set()
+        pols = set(); dirs = set(); ants = set()
+        freqs = set(); times = set(); freqwidths = set(); timewidths = set()
+        ptype = set()
 
         logging.info('Reading '+solType+'.')
 
