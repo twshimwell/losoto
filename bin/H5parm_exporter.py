@@ -36,35 +36,35 @@ def getSoltypeFromSolTabs(solTabs):
     for name, st in solTabs.iteritems():
         if st._v_title == 'amplitude':
             if dir == 'pointing':
-                solType == 'Gain'
+                solType = 'Gain'
             else:
-                solType == 'DirectionalGain'
+                solType = 'DirectionalGain'
         elif st._v_title == 'phase':
             if dir == 'pointing':
-                solType == 'Gain'
+                solType = 'Gain'
             else:
-                solType == 'DirectionalGain'
+                solType = 'DirectionalGain'
         elif st._v_title == 'rotation':
             if dir == 'pointing':
-                solType == 'CommonRotationAngle'
+                solType = 'CommonRotationAngle'
             else:
-                solType == 'RotationAngle'
+                solType = 'RotationAngle'
         elif st._v_title == 'scalarphase':
             if dir == 'pointing':
-                solType == 'CommonScalarPhase'
+                solType = 'CommonScalarPhase'
             else:
-                solType == 'ScalarPhase'
+                solType = 'ScalarPhase'
         elif st._v_title == 'scalaramplitude':
             if dir == 'pointing':
-                solType == 'CommonScalarAmplitude'
+                solType = 'CommonScalarAmplitude'
             else:
-                solType == 'ScalarAmplitude'
+                solType = 'ScalarAmplitude'
         elif st._v_title == 'clock':
-            solType == 'Clock'
+            solType = 'Clock'
         elif st._v_title == 'tec':
-            solType == 'TEC'
+            solType = 'TEC'
         elif st._v_title == 'rotationmeasure':
-            solType == 'RotationMeasure'
+            solType = 'RotationMeasure'
 
     return solTabList
 
